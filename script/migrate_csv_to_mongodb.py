@@ -9,11 +9,11 @@ MONGO_URI = os.getenv("MONGO_URI")
 DB_NAME = os.getenv("MONGO_URI")
 COLLECTION_NAME = os.getenv("MONGO_URI")
 
-def migrate_csv_to_mongodb(csv_path, mogo_uri, db_name, collection_name):
+def migrate_csv_to_mongodb(csv_path, mongo_uri, db_name, collection_name):
     
     df = pd.read_csv(csv_path)
 
-    client = MongoClient(mogo_uri)
+    client = MongoClient(mongo_uri)
     db = client[db_name]
     collection = db[collection_name]
 
