@@ -6,17 +6,16 @@ from dotenv import load_dotenv
 load_dotenv()
 
 MONGO_URI = os.getenv("MONGO_URI")
-DB_NAME = "medical_db"
-COLLECTION_NAME = "patients"
+DB_NAME = os.getenv("MONGO_URI")
+COLLECTION_NAME = os.getenv("MONGO_URI")
 
-def migrate_data(csv_path):
+def migrate_csv_to_mongodb(csv_path, mogo_uri, db_name, collection_name):
     
     df = pd.read_csv(csv_path)
 
-    
-    client = MongoClient(MONGO_URI)
-    db = client[DB_NAME]
-    collection = db[COLLECTION_NAME]
+    client = MongoClient(mogo_uri)
+    db = client[db_name]
+    collection = db[collection_name]
 
     data = df.to_dict(orient="records")
 
@@ -24,4 +23,4 @@ def migrate_data(csv_path):
     print(f"{len(result.inserted_ids)} documents insérés.")
 
 if __name__ == "__main__":
-    migrate_data("data/medical.csv")
+    migrate_csv_to_mongodb("data/migrate_csv_to_mongodb.csv",MONGO_URI,DB_NAME,COLLECTION_NAME)
