@@ -1,26 +1,119 @@
 import pandas as pd
+import uuid
 from pymongo import MongoClient
+from bson.decimal128 import Decimal128
 import os
 from dotenv import load_dotenv
+from roles import create_roles
 
 load_dotenv()
 
 MONGO_URI = os.getenv("MONGO_URI")
-DB_NAME = os.getenv("MONGO_URI")
-COLLECTION_NAME = os.getenv("MONGO_URI")
+DB_NAME = os.getenv("DB_NAME")
+COLLECTION_NAME = os.getenv("COLLECTION_NAME")
+
+ENUM_MAP = {
+    "Gender": {"Male": 1, "Female": 2},
+    "Blood Type": {
+        "A+": 1, "A-": 2, "B+": 3, "B-": 4,
+        "O+": 5, "O-": 6, "AB+": 7, "AB-": 8
+    },
+    "Medical Condition": {
+        "Cancer": 1, "Diabetes": 2, "Obesity": 3,
+        "Asthma": 4, "Hypertension": 5, "Healthy": 6
+    },
+    "Insurance Provider": {
+        "Blue Cross": 1, "Aetna": 2, "Medicare": 3,
+        "Medicaid": 4, "Cigna": 5
+    },
+    "Admission Type": {"Urgent": 1, "Emergency": 2, "Elective": 3},
+    "Medication": {"Paracetamol": 1, "Ibuprofen": 2, "Aspirin": 3, "Penicillin": 4, "Insulin": 5},
+    "Test Results": {"Normal": 1, "Abnormal": 2, "Inconclusive": 3}
+}
+
+DOCTOR_CACHE = {}
+HOSPITAL_CACHE = {}
+
+def get_or_create_id(name: str, cache: dict) -> str:
+    if name not in cache:
+        cache[name] = str(uuid.uuid4())
+    return cache[name]
+
+def create_indexes(db):
+    collection = db[COLLECTION_NAME]
+    collection.create_index("gender")
+    collection.create_index("bloodType")
+    collection.create_index("condition")
+    collection.create_index("admissionDate")
+    collection.create_index("admissionType")
+    collection.create_index("doctorId")
+    collection.create_index("hospitalId")
+    collection.create_index("insuranceProvider")
+
+
+## test de typage des colonnes et transformation
+
+def clean_and_transform(df):
+    df["Name"] = df["Name"].str.title()
+    df["Date of Admission"] = pd.to_datetime(df["Date of Admission"])
+    df["Discharge Date"] = pd.to_datetime(df["Discharge Date"])
+    df["Billing Amount"] = df["Billing Amount"].apply(lambda x: Decimal128(str(x)))
+    for col, mapping in ENUM_MAP.items():
+        if col in df.columns:
+            df[col] = df[col].map(mapping)
+    return df
+
+def df_to_mongo_documents(df):
+    docs = []
+    for _, row in df.iterrows():
+        first, last = row["Name"].split()[0], row["Name"].split()[-1]
+        doctor_name = row["Doctor"]
+        hospital_name = row["Hospital"]
+
+        doc = {
+            "name": {"first": first, "last": last},
+            "age": int(row["Age"]),
+            "gender": row["Gender"],
+            "bloodType": row["Blood Type"],
+            "condition": row["Medical Condition"],
+            "medication": row["Medication"],
+            "testResults": row["Test Results"],
+            "admissionDate": row["Date of Admission"].to_pydatetime(),
+            "dischargeDate": row["Discharge Date"].to_pydatetime(),
+            "admissionType": row["Admission Type"],
+            "doctorId": get_or_create_id(doctor_name, DOCTOR_CACHE),
+            "doctorName": doctor_name,
+            "hospitalId": get_or_create_id(hospital_name, HOSPITAL_CACHE),
+            "hospitalName": hospital_name,
+            "room": int(row["Room Number"]),
+            "insuranceProvider": row["Insurance Provider"],
+            "billingAmount": row["Billing Amount"]
+        }
+
+        docs.append(doc)
+    return docs
 
 def migrate_csv_to_mongodb(csv_path, mongo_uri, db_name, collection_name):
-    
     df = pd.read_csv(csv_path)
+    df_cleaned = clean_and_transform(df)
+    documents = df_to_mongo_documents(df_cleaned)
 
     client = MongoClient(mongo_uri)
     db = client[db_name]
+
+    create_roles(db)
+    create_indexes(db)
+
     collection = db[collection_name]
-
-    data = df.to_dict(orient="records")
-
-    result = collection.insert_many(data)
-    print(f"{len(result.inserted_ids)} documents insérés.")
+    # paquet de 100
+    result = collection.insert_many(documents, ordered=False)
+   # result = collection.bulk_write([100 * {}], ordered=False)
+    print(f"{len(result.inserted_ids)} documents insérés avec succès !")
 
 if __name__ == "__main__":
-    migrate_csv_to_mongodb("data/migrate_csv_to_mongodb.csv",MONGO_URI,DB_NAME,COLLECTION_NAME)
+    migrate_csv_to_mongodb(
+        "data/healthcare_dataset.csv",
+        MONGO_URI,
+        DB_NAME,
+        COLLECTION_NAME
+    )

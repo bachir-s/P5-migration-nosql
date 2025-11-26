@@ -32,3 +32,7 @@ def test_migrate_csv_to_mongodb(tmp_path):
             {"name": "Ali", "age": 30},
             {"name": "Sara", "age": 25}
         ])
+
+
+
+#test de connexion

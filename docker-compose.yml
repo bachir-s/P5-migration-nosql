@@ -1,0 +1,30 @@
+services:
+  mongo:
+    image: mongo:6
+    container_name: mongo
+    restart: always
+    ports:
+      - "27017:27017"
+    env_file:
+      - .env
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASS}
+    volumes:
+      - mongo_data:/data/db
+
+  migrate:
+    build: .
+    container_name: migration_script
+    depends_on:
+      - mongo
+    env_file:
+      - .env
+    environment:
+      MONGO_URI: "mongodb://${MONGO_USER}:${MONGO_PASS}@mongo:27017/?authSource=admin"
+      DB_NAME: ${MONGO_DB_NAME}
+      COLLECTION_NAME: "patients"
+    command: ["python", "script/migrate_csv_to_mongodb.py"]
+
+volumes:
+  mongo_data:
