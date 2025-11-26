@@ -41,17 +41,10 @@ def get_or_create_id(name: str, cache: dict) -> str:
 
 def create_indexes(db):
     collection = db[COLLECTION_NAME]
-    collection.create_index("gender")
-    collection.create_index("bloodType")
-    collection.create_index("condition")
-    collection.create_index("admissionDate")
-    collection.create_index("admissionType")
-    collection.create_index("doctorId")
-    collection.create_index("hospitalId")
-    collection.create_index("insuranceProvider")
-
-
-## test de typage des colonnes et transformation
+    collection.create_index("patient.name.last")
+    collection.create_index("encounter.admissionDate")
+    collection.create_index("encounter.hospital.id")
+    collection.create_index("encounter.doctor.id")  
 
 def clean_and_transform(df):
     df["Name"] = df["Name"].str.title()
@@ -71,25 +64,35 @@ def df_to_mongo_documents(df):
         hospital_name = row["Hospital"]
 
         doc = {
-            "name": {"first": first, "last": last},
-            "age": int(row["Age"]),
-            "gender": row["Gender"],
-            "bloodType": row["Blood Type"],
-            "condition": row["Medical Condition"],
-            "medication": row["Medication"],
-            "testResults": row["Test Results"],
-            "admissionDate": row["Date of Admission"].to_pydatetime(),
-            "dischargeDate": row["Discharge Date"].to_pydatetime(),
-            "admissionType": row["Admission Type"],
-            "doctorId": get_or_create_id(doctor_name, DOCTOR_CACHE),
-            "doctorName": doctor_name,
-            "hospitalId": get_or_create_id(hospital_name, HOSPITAL_CACHE),
-            "hospitalName": hospital_name,
-            "room": int(row["Room Number"]),
-            "insuranceProvider": row["Insurance Provider"],
-            "billingAmount": row["Billing Amount"]
+            "patient": {
+                "name": {"first": first, "last": last},
+                "age": int(row["Age"]),
+                "gender": row["Gender"],
+                "bloodType": row["Blood Type"],
+                "condition": row["Medical Condition"],
+                "insurance": {
+                    "provider": row["Insurance Provider"]
+                }
+            },
+            
+            "encounter": {
+                "admissionDate": row["Date of Admission"].to_pydatetime(),
+                "dischargeDate": row["Discharge Date"].to_pydatetime(),
+                "admissionType": row["Admission Type"],
+                "room": int(row["Room Number"]),
+                "medication": row["Medication"],
+                "testResults": row["Test Results"],
+                "doctor": {
+                    "id": get_or_create_id(doctor_name, DOCTOR_CACHE),
+                    "name": doctor_name
+                },
+                "hospital": {
+                    "id": get_or_create_id(hospital_name, HOSPITAL_CACHE),
+                    "name": hospital_name
+                },
+                "billingAmount": Decimal128(str(row["Billing Amount"]))
+            }
         }
-
         docs.append(doc)
     return docs
 

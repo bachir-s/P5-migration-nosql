@@ -24,7 +24,8 @@ def create_roles(db):
                     "resource": {"db": DB_NAME, "collection": ""},  # ← correct
                     "actions": actions
                 }],
-                "roles": []
+                "roles": [],
+                "mechanisms": ["SCRAM-SHA-256"]
             })
             print(f"Rôle créé : {role_name}")
 
