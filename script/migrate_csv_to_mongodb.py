@@ -1,10 +1,10 @@
 import pandas as pd
 import uuid
-from pymongo import MongoClient
+from pymongo import MongoClient , InsertOne
 from bson.decimal128 import Decimal128
 import os
 from dotenv import load_dotenv
-from roles import create_roles
+from script.roles import create_roles
 
 load_dotenv()
 
@@ -34,6 +34,9 @@ ENUM_MAP = {
 DOCTOR_CACHE = {}
 HOSPITAL_CACHE = {}
 
+BATCH_SIZE = 100
+
+
 def get_or_create_id(name: str, cache: dict) -> str:
     if name not in cache:
         cache[name] = str(uuid.uuid4())
@@ -59,13 +62,12 @@ def clean_and_transform(df):
 def df_to_mongo_documents(df):
     docs = []
     for _, row in df.iterrows():
-        first, last = row["Name"].split()[0], row["Name"].split()[-1]
         doctor_name = row["Doctor"]
         hospital_name = row["Hospital"]
 
         doc = {
             "patient": {
-                "name": {"first": first, "last": last},
+                "name": row["Name"],
                 "age": int(row["Age"]),
                 "gender": row["Gender"],
                 "bloodType": row["Blood Type"],
@@ -96,6 +98,7 @@ def df_to_mongo_documents(df):
         docs.append(doc)
     return docs
 
+
 def migrate_csv_to_mongodb(csv_path, mongo_uri, db_name, collection_name):
     df = pd.read_csv(csv_path)
     df_cleaned = clean_and_transform(df)
@@ -103,16 +106,28 @@ def migrate_csv_to_mongodb(csv_path, mongo_uri, db_name, collection_name):
 
     client = MongoClient(mongo_uri)
     db = client[db_name]
+    collection = db[collection_name]
 
     create_roles(db)
     create_indexes(db)
 
-    collection = db[collection_name]
-    # paquet de 100
-    result = collection.insert_many(documents, ordered=False)
-   # result = collection.bulk_write([100 * {}], ordered=False)
-    print(f"{len(result.inserted_ids)} documents insérés avec succès !")
+    operations = []
+    inserted_total = 0
 
+    for doc in documents:
+        operations.append(InsertOne(doc))
+
+        if len(operations) == BATCH_SIZE:
+            result = collection.bulk_write(operations, ordered=False)
+            inserted_total += result.inserted_count
+            operations = []
+
+    # dernier batch
+    if operations:
+        result = collection.bulk_write(operations, ordered=False)
+        inserted_total += result.inserted_count
+
+    print(f"{inserted_total} documents insérés avec succès !")
 if __name__ == "__main__":
     migrate_csv_to_mongodb(
         "data/healthcare_dataset.csv",
