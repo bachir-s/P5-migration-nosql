@@ -6,7 +6,6 @@ from script.migrate_csv_to_mongodb import migrate_csv_to_mongodb
 
 @pytest.fixture
 def sample_healthcare_data():
-    """Fixture that provides sample healthcare data for testing"""
     return pd.DataFrame([
         {
             "Name": "ali hassan",
@@ -46,7 +45,6 @@ def sample_healthcare_data():
 
 
 def test_migrate_csv_to_mongodb(tmp_path, sample_healthcare_data):
-    """Test the complete migration process with mocked MongoDB"""
     csv = tmp_path / "data.csv"
     sample_healthcare_data.to_csv(csv, index=False)
 
@@ -74,7 +72,6 @@ def test_migrate_csv_to_mongodb(tmp_path, sample_healthcare_data):
         )
 
         MockClient.assert_called_once_with("mongodb://fake")
-
         mock_create_roles.assert_called_once_with(mock_db)
         assert mock_collection.create_index.call_count == 4
         mock_collection.bulk_write.assert_called()
@@ -83,7 +80,6 @@ def test_migrate_csv_to_mongodb(tmp_path, sample_healthcare_data):
 
 
 def test_data_formatting(tmp_path, sample_healthcare_data):
-    """Test that data is properly formatted: dates, names (title case), and billing amounts (Decimal128)"""
     from script.migrate_csv_to_mongodb import clean_and_transform, df_to_mongo_documents
     from bson.decimal128 import Decimal128
     from datetime import datetime
@@ -98,19 +94,13 @@ def test_data_formatting(tmp_path, sample_healthcare_data):
     assert len(documents) == 2
 
     doc1 = documents[0]
-
-    assert doc1["patient"]["name"] == "Ali Hassan", f"Expected 'Ali Hassan', got '{doc1['patient']['name']}'"
-
-    assert isinstance(doc1["encounter"]["admissionDate"], datetime), \
-        f"admissionDate should be datetime, got {type(doc1['encounter']['admissionDate'])}"
-    assert isinstance(doc1["encounter"]["dischargeDate"], datetime), \
-        f"dischargeDate should be datetime, got {type(doc1['encounter']['dischargeDate'])}"
-
-    assert isinstance(doc1["encounter"]["billingAmount"], Decimal128), \
-        f"billingAmount should be Decimal128, got {type(doc1['encounter']['billingAmount'])}"
+    assert doc1["patient"]["name"] == "Ali Hassan"
+    assert isinstance(doc1["encounter"]["admissionDate"], datetime)
+    assert isinstance(doc1["encounter"]["dischargeDate"], datetime)
+    assert isinstance(doc1["encounter"]["billingAmount"], Decimal128)
 
     billing_value = float(doc1["encounter"]["billingAmount"].to_decimal())
-    assert billing_value == 1500.50, f"Expected 1500.50, got {billing_value}"
+    assert billing_value == 1500.50
 
     assert doc1["encounter"]["admissionDate"].year == 2023
     assert doc1["encounter"]["admissionDate"].month == 1
@@ -120,10 +110,7 @@ def test_data_formatting(tmp_path, sample_healthcare_data):
     assert doc1["encounter"]["dischargeDate"].day == 20
 
     doc2 = documents[1]
-
-    assert doc2["patient"]["name"] == "Sara Ahmed", f"Expected 'Sara Ahmed', got '{doc2['patient']['name']}'"
+    assert doc2["patient"]["name"] == "Sara Ahmed"
 
     billing_value2 = float(doc2["encounter"]["billingAmount"].to_decimal())
-    assert billing_value2 == 2000.75, f"Expected 2000.75, got {billing_value2}"
-
-
+    assert billing_value2 == 2000.75

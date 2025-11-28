@@ -1,6 +1,6 @@
 import pandas as pd
 import uuid
-from pymongo import MongoClient , InsertOne
+from pymongo import MongoClient, InsertOne
 from bson.decimal128 import Decimal128
 import os
 from dotenv import load_dotenv
@@ -9,8 +9,8 @@ from script.roles import create_roles
 load_dotenv()
 
 MONGO_URI = os.getenv("MONGO_URI")
-DB_NAME = os.getenv("DB_NAME")
-COLLECTION_NAME = os.getenv("COLLECTION_NAME")
+MONGO_DB_NAME = os.getenv("MONGO_DB_NAME")
+MONGO_COLLECTION_NAME = os.getenv("MONGO_COLLECTION_NAME")
 
 ENUM_MAP = {
     "Gender": {"Male": 1, "Female": 2},
@@ -33,7 +33,6 @@ ENUM_MAP = {
 
 DOCTOR_CACHE = {}
 HOSPITAL_CACHE = {}
-
 BATCH_SIZE = 100
 
 
@@ -42,12 +41,14 @@ def get_or_create_id(name: str, cache: dict) -> str:
         cache[name] = str(uuid.uuid4())
     return cache[name]
 
+
 def create_indexes(db):
-    collection = db[COLLECTION_NAME]
+    collection = db[MONGO_COLLECTION_NAME]
     collection.create_index("patient.name.last")
     collection.create_index("encounter.admissionDate")
     collection.create_index("encounter.hospital.id")
-    collection.create_index("encounter.doctor.id")  
+    collection.create_index("encounter.doctor.id")
+
 
 def clean_and_transform(df):
     df["Name"] = df["Name"].str.title()
@@ -58,6 +59,7 @@ def clean_and_transform(df):
         if col in df.columns:
             df[col] = df[col].map(mapping)
     return df
+
 
 def df_to_mongo_documents(df):
     docs = []
@@ -76,7 +78,6 @@ def df_to_mongo_documents(df):
                     "provider": row["Insurance Provider"]
                 }
             },
-            
             "encounter": {
                 "admissionDate": row["Date of Admission"].to_pydatetime(),
                 "dischargeDate": row["Discharge Date"].to_pydatetime(),
@@ -122,16 +123,17 @@ def migrate_csv_to_mongodb(csv_path, mongo_uri, db_name, collection_name):
             inserted_total += result.inserted_count
             operations = []
 
-    # dernier batch
     if operations:
         result = collection.bulk_write(operations, ordered=False)
         inserted_total += result.inserted_count
 
     print(f"{inserted_total} documents insérés avec succès !")
+
+
 if __name__ == "__main__":
     migrate_csv_to_mongodb(
         "data/healthcare_dataset.csv",
         MONGO_URI,
-        DB_NAME,
-        COLLECTION_NAME
+        MONGO_DB_NAME,
+        MONGO_COLLECTION_NAME
     )

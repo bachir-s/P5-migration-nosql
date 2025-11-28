@@ -6,6 +6,16 @@ load_dotenv()
 
 DB_NAME = os.getenv("MONGO_DB_NAME")
 
+
+def role_exists(db, role_name):
+    try:
+        roles_info = db.command("rolesInfo", 1)
+        existing_roles = [role["role"] for role in roles_info.get("roles", [])]
+        return role_name in existing_roles
+    except Exception:
+        return False
+
+
 def create_roles(db):
     roles = [
         ("DataModifier", ["find", "insert", "update", "remove"]),
@@ -17,11 +27,15 @@ def create_roles(db):
     ]
 
     for role_name, actions in roles:
+        if role_exists(db, role_name):
+            print(f"Rôle existe déjà : {role_name}")
+            continue
+
         try:
             db.command({
                 "createRole": role_name,
                 "privileges": [{
-                    "resource": {"db": DB_NAME, "collection": ""},  # ← correct
+                    "resource": {"db": DB_NAME, "collection": ""},
                     "actions": actions
                 }],
                 "roles": [],
